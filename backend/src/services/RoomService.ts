@@ -1,5 +1,5 @@
 import { nanoid } from 'nanoid';
-import { Room, User, CodeUpdate, CursorUpdate } from '../types/room';
+import { Room, User, CodeUpdate, CursorUpdate, ChatMessage } from '../types/room';
 import { Socket } from 'socket.io';
 
 export class RoomService {
@@ -10,12 +10,13 @@ export class RoomService {
   }
 
   createRoom(name: string): Room {
-    const roomId = nanoid(10);
+    const roomId = name;
     const room: Room = {
       id: roomId,
       name,
       createdAt: new Date(),
       users: new Map(),
+      messages: [],
       code: {
         html: '<div>\n  <!-- Write your HTML here -->\n</div>',
         css: '/* Write your CSS here */\n',
@@ -28,14 +29,27 @@ export class RoomService {
   }
 
   getRoom(roomId: string): Room | undefined {
-    return this.rooms.get(roomId);
+    let room = this.rooms.get(roomId);
+    if (!room) {
+      room = this.createRoom(roomId);
+    }
+    return room;
   }
 
   addUserToRoom(roomId: string, user: Omit<User, 'socket'>, socket: Socket): boolean {
-    const room = this.rooms.get(roomId);
+    const room = this.getRoom(roomId);
     if (!room) return false;
 
+    const existingUser = room.users.get(user.id);
+    if (existingUser) {
+      existingUser.socket.disconnect();
+      room.users.delete(user.id);
+    }
+
     room.users.set(user.id, { ...user, socket });
+    console.log(`Added user ${user.id} to room ${roomId}. Current users:`, 
+      Array.from(room.users.values()).map(u => ({ id: u.id, name: u.name }))
+    );
     return true;
   }
 
@@ -74,10 +88,29 @@ export class RoomService {
 
   broadcastToRoom(roomId: string, event: string, data: any, excludeUserId?: string): void {
     const room = this.rooms.get(roomId);
-    if (!room) return;
+    if (!room) {
+      console.error(`Cannot broadcast to non-existent room: ${roomId}`);
+      return;
+    }
+
+    console.log(`Broadcasting to room ${roomId}:`, {
+      event,
+      data,
+      excludeUserId,
+      numUsers: room.users.size,
+      users: Array.from(room.users.values()).map(u => ({
+        id: u.id,
+        name: u.name,
+        socketId: u.socket.id
+      }))
+    });
 
     room.users.forEach((user) => {
-      if (excludeUserId && user.id === excludeUserId) return;
+      if (excludeUserId && user.id === excludeUserId) {
+        console.log(`Skipping excluded user: ${user.id} (${user.socket.id})`);
+        return;
+      }
+      console.log(`Emitting to user: ${user.id} (${user.socket.id})`);
       user.socket.emit(event, data);
     });
   }
@@ -89,5 +122,33 @@ export class RoomService {
         this.rooms.delete(roomId);
       }
     });
+  }
+
+  addChatMessage(roomId: string, userId: string, userName: string, content: string): ChatMessage | null {
+    const room = this.rooms.get(roomId);
+    if (!room) return null;
+
+    const message: ChatMessage = {
+      id: nanoid(),
+      userId,
+      userName,
+      content,
+      timestamp: Date.now()
+    };
+
+    room.messages.push(message);
+
+    // Keep only the last 100 messages
+    if (room.messages.length > 100) {
+      room.messages = room.messages.slice(-100);
+    }
+
+    return message;
+  }
+
+  getRoomMessages(roomId: string): ChatMessage[] {
+    const room = this.rooms.get(roomId);
+    if (!room) return [];
+    return room.messages;
   }
 } 

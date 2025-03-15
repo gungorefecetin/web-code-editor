@@ -1,5 +1,13 @@
 import { Socket } from 'socket.io';
 
+export interface ChatMessage {
+  id: string;
+  userId: string;
+  userName: string;
+  content: string;
+  timestamp: number;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -16,6 +24,7 @@ export interface Room {
   name: string;
   createdAt: Date;
   users: Map<string, User>;
+  messages: ChatMessage[];
   code: {
     html: string;
     css: string;
