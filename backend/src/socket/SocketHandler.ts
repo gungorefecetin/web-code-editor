@@ -131,10 +131,24 @@ export class SocketHandler {
 
   private handleCodeUpdate(socket: Socket) {
     return ({ roomId, ...update }: { roomId: string } & CodeUpdate) => {
+      console.log(`[${socket.id}] Received code update:`, {
+        roomId,
+        language: update.language,
+        userId: update.userId,
+        contentLength: update.content.length
+      });
+      
       const success = this.roomService.updateCode(roomId, update);
       
       if (success) {
+        console.log(`[${socket.id}] Broadcasting code update to room ${roomId}:`, {
+          language: update.language,
+          userId: update.userId,
+          excludeUserId: update.userId
+        });
         this.roomService.broadcastToRoom(roomId, 'code_updated', update, update.userId);
+      } else {
+        console.error(`[${socket.id}] Failed to update code for room ${roomId}`);
       }
     };
   }

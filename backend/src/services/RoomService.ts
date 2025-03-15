@@ -62,7 +62,17 @@ export class RoomService {
 
   updateCode(roomId: string, update: CodeUpdate): boolean {
     const room = this.rooms.get(roomId);
-    if (!room) return false;
+    if (!room) {
+      console.error(`Room not found for code update: ${roomId}`);
+      return false;
+    }
+
+    console.log(`Updating code for room ${roomId}:`, {
+      language: update.language,
+      userId: update.userId,
+      contentLength: update.content.length,
+      currentContent: room.code[update.language].length
+    });
 
     room.code[update.language] = update.content;
     return true;
@@ -95,13 +105,13 @@ export class RoomService {
 
     console.log(`Broadcasting to room ${roomId}:`, {
       event,
-      data,
       excludeUserId,
       numUsers: room.users.size,
       users: Array.from(room.users.values()).map(u => ({
         id: u.id,
         name: u.name,
-        socketId: u.socket.id
+        socketId: u.socket.id,
+        isExcluded: u.id === excludeUserId
       }))
     });
 

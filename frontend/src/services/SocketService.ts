@@ -92,7 +92,12 @@ class SocketService {
     });
 
     this.socket.on('code_updated', (update: CodeUpdate) => {
-      console.log('Received code update:', update);
+      console.log('Received code update:', {
+        language: update.language,
+        userId: update.userId,
+        currentUserId: this.userId,
+        contentLength: update.content.length
+      });
       this.emit('code_updated', update);
     });
 
@@ -163,7 +168,20 @@ class SocketService {
   }
 
   updateCode(language: 'html' | 'css' | 'js', content: string) {
-    if (!this.socket || !this.roomId) return;
+    if (!this.socket || !this.roomId) {
+      console.error('Cannot update code: socket or room ID is missing', {
+        socketConnected: this.socket?.connected,
+        roomId: this.roomId
+      });
+      return;
+    }
+
+    console.log('Sending code update:', {
+      language,
+      contentLength: content.length,
+      userId: this.userId,
+      roomId: this.roomId
+    });
 
     this.socket.emit('code_update', {
       roomId: this.roomId,
